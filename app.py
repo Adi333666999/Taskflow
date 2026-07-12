@@ -1,82 +1,82 @@
 from flask import Flask, jsonify, request
-from threading import Lock
+import psycopg2
+import os
 
 app = Flask(__name__)
 
-# In-memory storage for Stage 1 (no database yet)
-tasks = []
-next_id = 1
-tasks_lock = Lock()
+# Connect to Neon cloud database
+def get_db():
+    conn = psycopg2.connect("postgresql://neondb_owner:npg_Sf7r9CUHInJM@ep-steep-sea-at7vqdmm-pooler.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
+    return conn
 
-@app.route('/', methods=['GET'])
-def index():
-    return jsonify({'message': 'Welcome to the Tasks API. Use /tasks to view data.'})
+# Create tasks table if not exists
+def init_db():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS tasks (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(200) NOT NULL,
+            done BOOLEAN DEFAULT FALSE
+        )
+    ''')
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 @app.route('/tasks', methods=['GET'])
 def get_tasks():
-    with tasks_lock:
-        return jsonify(tasks)
-
-@app.route('/tasks/<int:task_id>', methods=['GET'])
-def get_task(task_id):
-    with tasks_lock:
-        task = _find_task(task_id)
-        if task is None:
-            return jsonify({'error': 'Task not found'}), 404
-        return jsonify(task)
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, title, done FROM tasks')
+    rows = cursor.fetchall()
+    tasks = [{'id': r[0], 'title': r[1], 'done': r[2]} for r in rows]
+    cursor.close()
+    conn.close()
+    return jsonify(tasks)
 
 @app.route('/tasks', methods=['POST'])
 def add_task():
-    global next_id
-    data = request.get_json()
-    if not data or 'title' not in data or not data['title'].strip():
-        return jsonify({'error': 'Valid title is required'}), 400
-    
-    with tasks_lock:
-        task = {
-            'id': next_id,
-            'title': data['title'],
-            'done': False
-        }
-        tasks.append(task)
-        next_id += 1
-    return jsonify(task), 201
+    data = request.json
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT INTO tasks (title) VALUES (%s) RETURNING id, title, done',
+        (data['title'],)
+    )
+    row = cursor.fetchone()
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return jsonify({'id': row[0], 'title': row[1], 'done': row[2]}), 201
 
 @app.route('/tasks/<int:task_id>', methods=['PUT'])
 def update_task(task_id):
-    data = request.get_json()
-    if not data:
-        return jsonify({'error': 'Invalid request body'}), 400
-
-    with tasks_lock:
-        task = _find_task(task_id)
-        if task is None:
-            return jsonify({'error': 'Task not found'}), 404
-        
-        if 'title' in data:
-            if not data['title'].strip():
-                return jsonify({'error': 'Title cannot be empty'}), 400
-            task['title'] = data['title']
-            
-        if 'done' in data:
-            if not isinstance(data['done'], bool):
-                return jsonify({'error': 'Done must be a boolean'}), 400
-            task['done'] = data['done']
-            
-        return jsonify(task)
+    data = request.json
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        'UPDATE tasks SET title=%s, done=%s WHERE id=%s RETURNING id, title, done',
+        (data.get('title'), data.get('done'), task_id)
+    )
+    row = cursor.fetchone()
+    conn.commit()
+    cursor.close()
+    conn.close()
+    if row is None:
+        return jsonify({'error': 'Task not found'}), 404
+    return jsonify({'id': row[0], 'title': row[1], 'done': row[2]})
 
 @app.route('/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
-    with tasks_lock:
-        task = _find_task(task_id)
-        if task is None:
-            return jsonify({'error': 'Task not found'}), 404
-        tasks.remove(task)
-        return jsonify({'message': 'Task deleted'}), 200
-
-def _find_task(task_id):
-    """Helper to find a task by ID within the tasks list."""
-    return next((t for t in tasks if t['id'] == task_id), None)
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM tasks WHERE id=%s', (task_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return jsonify({'message': 'Task deleted'}), 200
 
 if __name__ == '__main__':
+    init_db()
     app.run(host='0.0.0.0', port=5000, debug=True)
