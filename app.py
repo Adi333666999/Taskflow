@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 # Connect to Neon cloud database
 def get_db():
-    conn = psycopg2.connect("postgresql://neondb_owner:npg_Sf7r9CUHInJM@ep-steep-sea-at7vqdmm-pooler.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
+    conn = psycopg2.connect(os.environ.get("DATABASE_URL")
     return conn
 
 # Create tasks table if not exists
