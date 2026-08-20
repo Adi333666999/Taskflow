@@ -1,4 +1,5 @@
 *.swp
 *.swo
 *.swn
+.env
 __pycache__/
