@@ -2,4 +2,6 @@
 *.swo
 *.swn
 .env
+*.pyc
+.git
 __pycache__/
