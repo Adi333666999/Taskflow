@@ -43,3 +43,7 @@ jobs:
         run: |
           docker push airoli/taskflow:latest
           docker push airoli/taskflow:${{ github.sha }}
+
+      - name: Trigger render deployment
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
