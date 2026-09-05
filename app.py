@@ -6,8 +6,7 @@ app = Flask(__name__)
 
 @app.route('/healthz', methods=['GET'])
 def healthz():
-    return jsonify({"status": "ok"}),
-200
+    return jsonify({"status": "ok"}), 200
 
 # Connect to Neon cloud database
 def get_db():
