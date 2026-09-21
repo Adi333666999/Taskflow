@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: taskflow
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: taskflow
+
+  template:
+    metadata:
+      labels:
+        app: taskflow
+
+    spec:
+      containers:
+        - name: taskflow
+          image: taskflow:1.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 10000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: taskflow-db
+                  key: DATABASE_URL 
