@@ -48,12 +48,19 @@ jobs:
         run: |
           curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
 
-  test-self-hosted:
+  deploy:
+    needs: build
     runs-on: self-hosted
 
-    steps:
-      - name: Test local runner
+    steps: 
+      - name: Check K8s
         run: |
-          echo "Running on my local machine"
-          hostname
           kubectl get nodes
+
+      - name: Deploy Taskflow
+        run: |
+          kubectl set image deployment/taskflow taskflow=airoli/taskflow:${{ github.sha }}
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/taskflow
