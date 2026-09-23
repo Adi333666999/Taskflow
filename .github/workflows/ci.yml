@@ -47,3 +47,13 @@ jobs:
       - name: Trigger render deployment
         run: |
           curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+ test-self-hosted:
+   runs-on: self-hosted
+
+   steps:
+     - name: Test local runner
+       run: |
+         echo "Running on my local machine"
+         hostname
+         kubectl get nodes
